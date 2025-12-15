@@ -75,6 +75,9 @@ async function loadWeeklyWeather() {
   const settings = JSON.parse(localStorage.getItem("settings")) || { lat: "35.6895", lon: "139.6917" };
   const container = document.getElementById("weekly-weather");
 
+  // コンテナが存在しない場合はスキップ
+  if (!container) return;
+
   try {
     const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${settings.lat}&longitude=${settings.lon}&daily=weathercode,temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=Asia%2FTokyo`);
     const data = await res.json();
@@ -104,7 +107,7 @@ async function loadWeeklyWeather() {
       `;
     }).join('');
   } catch (e) {
-    container.innerHTML = '<p style="color:#ff4c6d;">週間天気の取得に失敗しました</p>';
+    if (container) container.innerHTML = '<p style="color:#ff4c6d;">週間天気の取得に失敗しました</p>';
   }
 }
 loadWeeklyWeather();
