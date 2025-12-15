@@ -70,6 +70,115 @@ async function loadWeather() {
 }
 loadWeather();
 
+// ---- 週間天気予報 ----
+async function loadWeeklyWeather() {
+  const settings = JSON.parse(localStorage.getItem("settings")) || { lat: "35.6895", lon: "139.6917" };
+  const container = document.getElementById("weekly-weather");
+
+  try {
+    const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${settings.lat}&longitude=${settings.lon}&daily=weathercode,temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=Asia%2FTokyo`);
+    const data = await res.json();
+
+    const days = ["日", "月", "火", "水", "木", "金", "土"];
+    const today = new Date().toISOString().split('T')[0];
+
+    container.innerHTML = data.daily.time.map((date, i) => {
+      const d = new Date(date);
+      const dayName = days[d.getDay()];
+      const dateStr = `${d.getMonth() + 1}/${d.getDate()}`;
+      const isToday = date === today;
+      const icon = weatherIcon(data.daily.weathercode[i]);
+      const high = Math.round(data.daily.temperature_2m_max[i]);
+      const low = Math.round(data.daily.temperature_2m_min[i]);
+      const precip = data.daily.precipitation_probability_max[i];
+
+      return `
+        <div class="weather-day ${isToday ? 'today' : ''}">
+          <span class="day-name">${dayName}</span>
+          <span class="day-date">${dateStr}</span>
+          <span class="weather-icon">${icon}</span>
+          <span class="temp-high">${high}°</span>
+          <span class="temp-low">${low}°</span>
+          ${precip > 0 ? `<span class="precip">💧${precip}%</span>` : ''}
+        </div>
+      `;
+    }).join('');
+  } catch (e) {
+    container.innerHTML = '<p style="color:#ff4c6d;">週間天気の取得に失敗しました</p>';
+  }
+}
+loadWeeklyWeather();
+
+// ---- ニュースフィード ----
+async function loadNewsFeed() {
+  const container = document.getElementById("news-feed");
+
+  try {
+    // RSS2JSON API を使用してYahoo!ニュースのRSSを取得
+    const rssUrl = encodeURIComponent("https://news.yahoo.co.jp/rss/topics/top-picks.xml");
+    const res = await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${rssUrl}`);
+    const data = await res.json();
+
+    if (data.status === "ok" && data.items && data.items.length > 0) {
+      container.innerHTML = data.items.slice(0, 8).map(item => {
+        const pubDate = new Date(item.pubDate);
+        const timeAgo = getTimeAgo(pubDate);
+
+        return `
+          <div class="news-item">
+            <a href="${item.link}" target="_blank">${item.title}</a>
+            <div class="news-source">
+              <span class="news-category">トップ</span>
+              <span>${timeAgo}</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+    } else {
+      // フォールバック: ダミーニュース
+      showDummyNews(container);
+    }
+  } catch (e) {
+    console.error("News fetch error:", e);
+    showDummyNews(container);
+  }
+}
+
+function showDummyNews(container) {
+  const dummyNews = [
+    { title: "本日のトップニュース - 最新情報をお届け", category: "国内" },
+    { title: "経済市場動向 - 株価・為替の最新情報", category: "経済" },
+    { title: "テクノロジー最前線 - 新製品発表", category: "IT" },
+    { title: "エンタメ情報 - 話題の映画・音楽", category: "エンタメ" },
+    { title: "スポーツニュース - 本日の試合結果", category: "スポーツ" }
+  ];
+
+  container.innerHTML = dummyNews.map(item => `
+    <div class="news-item">
+      <a href="https://news.yahoo.co.jp/" target="_blank">${item.title}</a>
+      <div class="news-source">
+        <span class="news-category">${item.category}</span>
+        <span>デモデータ</span>
+      </div>
+    </div>
+  `).join('');
+}
+
+function getTimeAgo(date) {
+  const now = new Date();
+  const diffMs = now - date;
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+
+  if (diffMins < 1) return "たった今";
+  if (diffMins < 60) return `${diffMins}分前`;
+  if (diffHours < 24) return `${diffHours}時間前`;
+  return `${diffDays}日前`;
+}
+
+loadNewsFeed();
+
 // ---- データ管理 ----
 function getData() { return JSON.parse(localStorage.getItem("categories") || "[]"); }
 function saveData(data) { localStorage.setItem("categories", JSON.stringify(data)); }
@@ -406,6 +515,7 @@ function applySettings() {
   const settings = getSettings();
   document.body.style.backgroundImage = `url("${settings.bgUrl}")`;
   loadWeather();
+  loadWeeklyWeather();
 }
 
 // Modal Event Listeners
@@ -438,3 +548,571 @@ applySettings();
 
 // 初期表示
 loadCategories();
+
+// =====================================================
+// カスタムカレンダー with Google Calendar API
+// =====================================================
+
+// カレンダー状態
+const calendarState = {
+  currentDate: new Date(),
+  view: 'month', // 'month' or 'week'
+  events: [],
+  weeklyWeatherData: null,
+  isLoggedIn: false,
+  accessToken: null
+};
+
+// DOM要素
+const calendarElements = {
+  loginBtn: document.getElementById('google-login-btn'),
+  loginText: document.getElementById('login-text'),
+  viewMonthBtn: document.getElementById('view-month'),
+  viewWeekBtn: document.getElementById('view-week'),
+  prevBtn: document.getElementById('cal-prev'),
+  nextBtn: document.getElementById('cal-next'),
+  todayBtn: document.getElementById('cal-today'),
+  calTitle: document.getElementById('cal-title'),
+  monthView: document.getElementById('month-view'),
+  weekView: document.getElementById('week-view'),
+  monthGrid: document.getElementById('month-grid'),
+  weekGrid: document.getElementById('week-grid'),
+  agendaList: document.getElementById('agenda-list'),
+  eventModal: document.getElementById('event-modal'),
+  closeEventModal: document.getElementById('close-event-modal'),
+  eventTitle: document.getElementById('event-title'),
+  eventDate: document.getElementById('event-date'),
+  eventStartTime: document.getElementById('event-start-time'),
+  eventEndTime: document.getElementById('event-end-time'),
+  saveEventBtn: document.getElementById('save-event'),
+  clientIdInput: document.getElementById('client-id-input')
+};
+
+// Google OAuth設定
+const SCOPES = 'https://www.googleapis.com/auth/calendar';
+let tokenClient = null;
+
+// 初期化
+function initCalendar() {
+  renderCalendar();
+  setupCalendarEventListeners();
+  loadWeatherForCalendar();
+  
+  // Google Identity Services の初期化を待つ
+  if (typeof google !== 'undefined' && google.accounts) {
+    initGoogleAuth();
+  } else {
+    // GIS ライブラリが読み込まれたら初期化
+    window.addEventListener('load', () => {
+      setTimeout(() => {
+        if (typeof google !== 'undefined' && google.accounts) {
+          initGoogleAuth();
+        }
+      }, 500);
+    });
+  }
+}
+
+// Google認証初期化
+function initGoogleAuth() {
+  const settings = getSettings();
+  if (!settings.clientId) {
+    console.log('Client ID not set');
+    return;
+  }
+  
+  try {
+    tokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: settings.clientId,
+      scope: SCOPES,
+      callback: (response) => {
+        if (response.access_token) {
+          calendarState.accessToken = response.access_token;
+          calendarState.isLoggedIn = true;
+          updateLoginButton();
+          fetchCalendarEvents();
+        }
+      },
+    });
+  } catch (e) {
+    console.error('Google Auth init error:', e);
+  }
+}
+
+// ログインボタンクリック
+function handleLoginClick() {
+  const settings = getSettings();
+  if (!settings.clientId) {
+    alert('設定画面でGoogle OAuth Client IDを入力してください');
+    return;
+  }
+  
+  if (!tokenClient) {
+    initGoogleAuth();
+  }
+  
+  if (calendarState.isLoggedIn) {
+    // ログアウト
+    calendarState.isLoggedIn = false;
+    calendarState.accessToken = null;
+    calendarState.events = [];
+    google.accounts.oauth2.revoke(calendarState.accessToken);
+    updateLoginButton();
+    renderCalendar();
+    renderAgenda();
+  } else {
+    // ログイン
+    if (tokenClient) {
+      tokenClient.requestAccessToken();
+    }
+  }
+}
+
+// ログインボタン更新
+function updateLoginButton() {
+  if (calendarState.isLoggedIn) {
+    calendarElements.loginBtn.classList.add('logged-in');
+    calendarElements.loginText.textContent = 'ログイン中';
+  } else {
+    calendarElements.loginBtn.classList.remove('logged-in');
+    calendarElements.loginText.textContent = 'Googleでログイン';
+  }
+}
+
+// カレンダーイベント取得
+async function fetchCalendarEvents() {
+  if (!calendarState.accessToken) return;
+  
+  const startOfMonth = new Date(calendarState.currentDate.getFullYear(), calendarState.currentDate.getMonth(), 1);
+  const endOfMonth = new Date(calendarState.currentDate.getFullYear(), calendarState.currentDate.getMonth() + 2, 0);
+  
+  try {
+    const response = await fetch(
+      `https://www.googleapis.com/calendar/v3/calendars/primary/events?` +
+      `timeMin=${startOfMonth.toISOString()}&` +
+      `timeMax=${endOfMonth.toISOString()}&` +
+      `singleEvents=true&orderBy=startTime`,
+      {
+        headers: {
+          'Authorization': `Bearer ${calendarState.accessToken}`
+        }
+      }
+    );
+    
+    if (response.ok) {
+      const data = await response.json();
+      calendarState.events = data.items || [];
+      renderCalendar();
+      renderAgenda();
+    } else if (response.status === 401) {
+      // トークン期限切れ
+      calendarState.isLoggedIn = false;
+      calendarState.accessToken = null;
+      updateLoginButton();
+    }
+  } catch (e) {
+    console.error('Calendar fetch error:', e);
+  }
+}
+
+// イベント作成
+async function createCalendarEvent(title, date, startTime, endTime) {
+  if (!calendarState.accessToken) {
+    alert('先にGoogleにログインしてください');
+    return false;
+  }
+  
+  let event;
+  if (startTime && endTime) {
+    // 時間指定あり
+    event = {
+      summary: title,
+      start: { dateTime: `${date}T${startTime}:00`, timeZone: 'Asia/Tokyo' },
+      end: { dateTime: `${date}T${endTime}:00`, timeZone: 'Asia/Tokyo' }
+    };
+  } else {
+    // 終日イベント
+    event = {
+      summary: title,
+      start: { date: date },
+      end: { date: date }
+    };
+  }
+  
+  try {
+    const response = await fetch(
+      'https://www.googleapis.com/calendar/v3/calendars/primary/events',
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${calendarState.accessToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(event)
+      }
+    );
+    
+    if (response.ok) {
+      await fetchCalendarEvents();
+      return true;
+    } else {
+      const err = await response.json();
+      alert('イベント作成に失敗しました: ' + (err.error?.message || ''));
+      return false;
+    }
+  } catch (e) {
+    console.error('Event create error:', e);
+    alert('エラーが発生しました');
+    return false;
+  }
+}
+
+// カレンダー描画
+function renderCalendar() {
+  updateCalendarTitle();
+  if (calendarState.view === 'month') {
+    renderMonthView();
+  } else {
+    renderWeekView();
+  }
+}
+
+// タイトル更新
+function updateCalendarTitle() {
+  const year = calendarState.currentDate.getFullYear();
+  const month = calendarState.currentDate.getMonth() + 1;
+  if (calendarState.view === 'month') {
+    calendarElements.calTitle.textContent = `${year}年${month}月`;
+  } else {
+    const weekStart = getWeekStart(calendarState.currentDate);
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekEnd.getDate() + 6);
+    calendarElements.calTitle.textContent = 
+      `${weekStart.getMonth() + 1}/${weekStart.getDate()} - ${weekEnd.getMonth() + 1}/${weekEnd.getDate()}`;
+  }
+}
+
+// 週の開始日取得（日曜始まり）
+function getWeekStart(date) {
+  const d = new Date(date);
+  const day = d.getDay();
+  d.setDate(d.getDate() - day);
+  return d;
+}
+
+// 月ビュー描画
+function renderMonthView() {
+  const year = calendarState.currentDate.getFullYear();
+  const month = calendarState.currentDate.getMonth();
+  const firstDay = new Date(year, month, 1);
+  const lastDay = new Date(year, month + 1, 0);
+  const startDate = new Date(firstDay);
+  startDate.setDate(startDate.getDate() - firstDay.getDay());
+  
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  
+  let html = '';
+  for (let i = 0; i < 42; i++) {
+    const date = new Date(startDate);
+    date.setDate(date.getDate() + i);
+    const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    const isOtherMonth = date.getMonth() !== month;
+    const isToday = dateStr === todayStr;
+    const dayOfWeek = date.getDay();
+    const hasEvents = calendarState.events.some(e => {
+      const eventDate = e.start.date || e.start.dateTime?.split('T')[0];
+      return eventDate === dateStr;
+    });
+    
+    let classes = 'day-cell';
+    if (isOtherMonth) classes += ' other-month';
+    if (isToday) classes += ' today';
+    if (dayOfWeek === 0) classes += ' sun';
+    if (dayOfWeek === 6) classes += ' sat';
+    if (hasEvents) classes += ' has-events';
+    
+    html += `
+      <div class="${classes}" data-date="${dateStr}">
+        <span class="day-number">${date.getDate()}</span>
+      </div>
+    `;
+  }
+  
+  calendarElements.monthGrid.innerHTML = html;
+  
+  // 日付クリックで予定追加
+  document.querySelectorAll('.day-cell').forEach(cell => {
+    cell.addEventListener('click', () => {
+      openEventModal(cell.dataset.date);
+    });
+  });
+}
+
+// 週ビュー描画
+function renderWeekView() {
+  const weekStart = getWeekStart(calendarState.currentDate);
+  const days = ['日', '月', '火', '水', '木', '金', '土'];
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  
+  let html = '';
+  for (let i = 0; i < 7; i++) {
+    const date = new Date(weekStart);
+    date.setDate(date.getDate() + i);
+    const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    const isToday = dateStr === todayStr;
+    const dayOfWeek = date.getDay();
+    
+    // この日のイベント取得
+    const dayEvents = calendarState.events.filter(e => {
+      const eventDate = e.start.date || e.start.dateTime?.split('T')[0];
+      return eventDate === dateStr;
+    });
+    
+    // 天気取得
+    let weatherHtml = '';
+    if (calendarState.weeklyWeatherData && calendarState.weeklyWeatherData.daily) {
+      const weatherIndex = calendarState.weeklyWeatherData.daily.time.indexOf(dateStr);
+      if (weatherIndex !== -1) {
+        const icon = weatherIcon(calendarState.weeklyWeatherData.daily.weathercode[weatherIndex]);
+        const high = Math.round(calendarState.weeklyWeatherData.daily.temperature_2m_max[weatherIndex]);
+        const low = Math.round(calendarState.weeklyWeatherData.daily.temperature_2m_min[weatherIndex]);
+        weatherHtml = `
+          <div class="week-weather">
+            <span>${icon}</span>
+            <span class="temp">${high}°/${low}°</span>
+          </div>
+        `;
+      }
+    }
+    
+    let classes = 'week-day-row';
+    if (isToday) classes += ' today';
+    if (dayOfWeek === 0) classes += ' sun';
+    if (dayOfWeek === 6) classes += ' sat';
+    
+    html += `
+      <div class="${classes}" data-date="${dateStr}">
+        <div class="week-day-info">
+          <span class="week-day-name">${days[dayOfWeek]}</span>
+          <span class="week-day-date">${date.getDate()}</span>
+          ${weatherHtml}
+        </div>
+        <div class="week-events">
+          ${dayEvents.map(e => `
+            <div class="week-event-item">${e.summary || '(タイトルなし)'}</div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  }
+  
+  calendarElements.weekGrid.innerHTML = html;
+  
+  // 日付クリックで予定追加
+  document.querySelectorAll('.week-day-row').forEach(row => {
+    row.addEventListener('click', () => {
+      openEventModal(row.dataset.date);
+    });
+  });
+}
+
+// アジェンダ描画
+function renderAgenda() {
+  if (!calendarState.isLoggedIn || calendarState.events.length === 0) {
+    calendarElements.agendaList.innerHTML = '<div class="agenda-empty">ログインして予定を表示</div>';
+    return;
+  }
+  
+  const days = ['日', '月', '火', '水', '木', '金', '土'];
+  const upcomingEvents = calendarState.events
+    .filter(e => {
+      const eventDate = new Date(e.start.date || e.start.dateTime);
+      return eventDate >= new Date(new Date().setHours(0, 0, 0, 0));
+    })
+    .slice(0, 10);
+  
+  if (upcomingEvents.length === 0) {
+    calendarElements.agendaList.innerHTML = '<div class="agenda-empty">今後の予定はありません</div>';
+    return;
+  }
+  
+  calendarElements.agendaList.innerHTML = upcomingEvents.map(e => {
+    const startDate = new Date(e.start.date || e.start.dateTime);
+    const timeStr = e.start.dateTime 
+      ? new Date(e.start.dateTime).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })
+      : '終日';
+    
+    return `
+      <div class="agenda-item">
+        <div class="agenda-date">
+          <span class="month">${startDate.getMonth() + 1}月</span>
+          <span class="day">${startDate.getDate()}</span>
+          <span class="weekday">${days[startDate.getDay()]}</span>
+        </div>
+        <div class="agenda-content">
+          <span class="event-title">${e.summary || '(タイトルなし)'}</span>
+          <span class="event-time">${timeStr}</span>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+// 予定追加モーダルを開く
+function openEventModal(dateStr) {
+  if (!calendarState.isLoggedIn) {
+    alert('予定を追加するにはGoogleにログインしてください');
+    return;
+  }
+  calendarElements.eventDate.value = dateStr;
+  calendarElements.eventTitle.value = '';
+  calendarElements.eventStartTime.value = '';
+  calendarElements.eventEndTime.value = '';
+  calendarElements.eventModal.style.display = 'flex';
+}
+
+// モーダルを閉じる
+function closeEventModalFn() {
+  calendarElements.eventModal.style.display = 'none';
+}
+
+// 予定保存
+async function saveEvent() {
+  const title = calendarElements.eventTitle.value.trim();
+  const date = calendarElements.eventDate.value;
+  const startTime = calendarElements.eventStartTime.value;
+  const endTime = calendarElements.eventEndTime.value;
+  
+  if (!title) {
+    alert('タイトルを入力してください');
+    return;
+  }
+  if (!date) {
+    alert('日付を選択してください');
+    return;
+  }
+  
+  const success = await createCalendarEvent(title, date, startTime, endTime);
+  if (success) {
+    closeEventModalFn();
+  }
+}
+
+// カレンダー用天気読み込み
+async function loadWeatherForCalendar() {
+  const settings = JSON.parse(localStorage.getItem("settings")) || { lat: "35.6895", lon: "139.6917" };
+  try {
+    const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${settings.lat}&longitude=${settings.lon}&daily=weathercode,temperature_2m_max,temperature_2m_min&timezone=Asia%2FTokyo`);
+    calendarState.weeklyWeatherData = await res.json();
+    if (calendarState.view === 'week') {
+      renderWeekView();
+    }
+  } catch (e) {
+    console.error('Weather fetch error:', e);
+  }
+}
+
+// イベントリスナー設定
+function setupCalendarEventListeners() {
+  // ログインボタン
+  calendarElements.loginBtn.addEventListener('click', handleLoginClick);
+  
+  // ビュー切替
+  calendarElements.viewMonthBtn.addEventListener('click', () => {
+    calendarState.view = 'month';
+    calendarElements.viewMonthBtn.classList.add('active');
+    calendarElements.viewWeekBtn.classList.remove('active');
+    calendarElements.monthView.style.display = 'block';
+    calendarElements.weekView.style.display = 'none';
+    renderCalendar();
+  });
+  
+  calendarElements.viewWeekBtn.addEventListener('click', () => {
+    calendarState.view = 'week';
+    calendarElements.viewWeekBtn.classList.add('active');
+    calendarElements.viewMonthBtn.classList.remove('active');
+    calendarElements.weekView.style.display = 'block';
+    calendarElements.monthView.style.display = 'none';
+    renderCalendar();
+  });
+  
+  // ナビゲーション
+  calendarElements.prevBtn.addEventListener('click', () => {
+    if (calendarState.view === 'month') {
+      calendarState.currentDate.setMonth(calendarState.currentDate.getMonth() - 1);
+    } else {
+      calendarState.currentDate.setDate(calendarState.currentDate.getDate() - 7);
+    }
+    renderCalendar();
+    if (calendarState.isLoggedIn) fetchCalendarEvents();
+  });
+  
+  calendarElements.nextBtn.addEventListener('click', () => {
+    if (calendarState.view === 'month') {
+      calendarState.currentDate.setMonth(calendarState.currentDate.getMonth() + 1);
+    } else {
+      calendarState.currentDate.setDate(calendarState.currentDate.getDate() + 7);
+    }
+    renderCalendar();
+    if (calendarState.isLoggedIn) fetchCalendarEvents();
+  });
+  
+  calendarElements.todayBtn.addEventListener('click', () => {
+    calendarState.currentDate = new Date();
+    renderCalendar();
+    if (calendarState.isLoggedIn) fetchCalendarEvents();
+  });
+  
+  // 予定モーダル
+  calendarElements.closeEventModal.addEventListener('click', closeEventModalFn);
+  calendarElements.saveEventBtn.addEventListener('click', saveEvent);
+  
+  // モーダル外クリックで閉じる
+  calendarElements.eventModal.addEventListener('click', (e) => {
+    if (e.target === calendarElements.eventModal) {
+      closeEventModalFn();
+    }
+  });
+}
+
+// 設定にClient IDを追加
+const originalGetSettings = getSettings;
+window.getSettings = function() {
+  const defaultSettings = {
+    bgUrl: "https://images.unsplash.com/photo-1496568816309-51d7c20e3b21?q=80&w=1631&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
+    lat: "35.6895",
+    lon: "139.6917",
+    clientId: ""
+  };
+  const saved = JSON.parse(localStorage.getItem("settings")) || {};
+  return { ...defaultSettings, ...saved };
+};
+
+// 設定モーダルの開閉処理を拡張
+const originalOpenSettings = document.getElementById("open-settings").onclick;
+document.getElementById("open-settings").addEventListener("click", () => {
+  const settings = getSettings();
+  if (calendarElements.clientIdInput) {
+    calendarElements.clientIdInput.value = settings.clientId || '';
+  }
+});
+
+// 設定保存を拡張
+const originalSaveSettings = document.getElementById("save-settings");
+originalSaveSettings.addEventListener("click", () => {
+  // 既存の保存処理は維持しつつ、clientIdも保存
+  setTimeout(() => {
+    const settings = getSettings();
+    settings.clientId = calendarElements.clientIdInput?.value || '';
+    saveSettingsToStorage(settings);
+    // OAuth再初期化
+    if (settings.clientId) {
+      initGoogleAuth();
+    }
+  }, 0);
+}, true);
+
+// カレンダー初期化
+initCalendar();

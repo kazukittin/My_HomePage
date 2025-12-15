@@ -5,6 +5,7 @@
   <meta charset="UTF-8">
   <title>My Start Page</title>
   <link rel="stylesheet" href="style.css">
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 
 <body>
@@ -54,32 +55,88 @@
 
         <div id="category-list"></div>
       </section>
+
+      <!-- ニュースフィード -->
+      <section class="card news-card">
+        <div class="section-header">
+          <h2>📰 ニュース</h2>
+          <a href="https://news.yahoo.co.jp/" target="_blank" class="more-link">もっと見る →</a>
+        </div>
+        <div id="news-feed" class="news-feed">
+          <div class="news-item skeleton-news">
+            <span class="skeleton" style="width:100%; height:20px"></span>
+          </div>
+          <div class="news-item skeleton-news">
+            <span class="skeleton" style="width:100%; height:20px"></span>
+          </div>
+          <div class="news-item skeleton-news">
+            <span class="skeleton" style="width:100%; height:20px"></span>
+          </div>
+        </div>
+      </section>
     </div>
 
     <!-- 右カラム -->
     <div class="right-column">
-      <!-- 月カレンダーカード -->
-      <section class="card calendar-agenda" aria-label="Calendar and Agenda">
-        <div class="calendar-agenda-wrapper">
-
-          <!-- Googleカレンダーを開くボタン -->
-          <div class="calendar-header">
-            <button class="calendar-btn" onclick="window.open('https://calendar.google.com/calendar/u/0/r','_blank')">
-              📅 Googleカレンダーを開く
-            </button>
+      <!-- 週間天気予報 -->
+      <section class="card weather-card">
+        <div class="section-header">
+          <h2>🌤️ 週間天気</h2>
+        </div>
+        <div id="weekly-weather" class="weekly-weather">
+          <div class="weather-day skeleton-weather">
+            <span class="skeleton" style="width:100%; height:60px"></span>
           </div>
+        </div>
+      </section>
 
-          <!-- 月カレンダー（埋め込み） -->
-          <iframe
-            src="https://calendar.google.com/calendar/embed?height=600&wkst=1&ctz=Asia%2FTokyo&showPrint=0&src=a2F6dXRha3U4NDkyQGdtYWlsLmNvbQ&src=amEuamFwYW5lc2UjaG9saWRheUBncm91cC52LmNhbGVuZGFyLmdvb2dsZS5jb20&color=%23039be5&color=%230b8043"
-            style="border:solid 1px #777" width="100%" height="400" frameborder="0" scrolling="no">
-          </iframe>
+      <!-- カスタムカレンダー -->
+      <section class="card calendar-section" aria-label="Calendar">
+        <!-- ヘッダー：Googleログイン & ビュー切替 -->
+        <div class="calendar-top-bar">
+          <button id="google-login-btn" class="google-login-btn">
+            <span class="login-icon">🔐</span>
+            <span id="login-text">Googleでログイン</span>
+          </button>
+          <div class="view-toggle">
+            <button id="view-month" class="view-btn active">月</button>
+            <button id="view-week" class="view-btn">週</button>
+          </div>
+        </div>
 
-          <!-- アジェンダ（そのまま埋め込み） -->
-          <iframe
-            src="https://calendar.google.com/calendar/embed?height=600&wkst=1&ctz=Asia%2FTokyo&showPrint=0&mode=AGENDA&src=a2F6dXRha3U4NDkyQGdtYWlsLmNvbQ&src=amEuamFwYW5lc2UjaG9saWRheUBncm91cC52LmNhbGVuZGFyLmdvb2dsZS5jb20&color=%23039be5&color=%230b8043"
-            style="border:solid 1px #777" width="100%" height="300" frameborder="0" scrolling="no">
-          </iframe>
+        <!-- カレンダーナビゲーション -->
+        <div class="calendar-nav">
+          <button id="cal-prev" class="nav-btn">◀</button>
+          <span id="cal-title" class="cal-title">2025年12月</span>
+          <button id="cal-next" class="nav-btn">▶</button>
+          <button id="cal-today" class="today-btn">今日</button>
+        </div>
+
+        <!-- 月ビュー -->
+        <div id="month-view" class="calendar-view">
+          <div class="weekday-header">
+            <span class="weekday sun">日</span>
+            <span class="weekday">月</span>
+            <span class="weekday">火</span>
+            <span class="weekday">水</span>
+            <span class="weekday">木</span>
+            <span class="weekday">金</span>
+            <span class="weekday sat">土</span>
+          </div>
+          <div id="month-grid" class="month-grid"></div>
+        </div>
+
+        <!-- 週ビュー -->
+        <div id="week-view" class="calendar-view" style="display:none;">
+          <div id="week-grid" class="week-grid"></div>
+        </div>
+
+        <!-- 予定リスト -->
+        <div class="agenda-section">
+          <h3 class="agenda-title">📋 今後の予定</h3>
+          <div id="agenda-list" class="agenda-list">
+            <div class="agenda-empty">ログインして予定を表示</div>
+          </div>
         </div>
       </section>
     </div>
@@ -107,7 +164,47 @@
       </div>
 
       <div class="setting-item">
+        <label>Google OAuth Client ID</label>
+        <input type="text" id="client-id-input" placeholder="xxxxxxxxx.apps.googleusercontent.com">
+        <small style="color:#888;">Google Cloud Console で取得</small>
+      </div>
+
+      <div class="setting-item">
         <button id="save-settings" class="primary-btn">保存して閉じる</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 予定追加モーダル -->
+  <div id="event-modal" class="modal" style="display:none;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>📅 予定を追加</h2>
+        <span class="close-modal" id="close-event-modal">&times;</span>
+      </div>
+
+      <div class="setting-item">
+        <label>タイトル</label>
+        <input type="text" id="event-title" placeholder="予定のタイトル">
+      </div>
+
+      <div class="setting-item">
+        <label>日付</label>
+        <input type="date" id="event-date">
+      </div>
+
+      <div class="setting-item">
+        <label>開始時刻 (任意)</label>
+        <input type="time" id="event-start-time">
+      </div>
+
+      <div class="setting-item">
+        <label>終了時刻 (任意)</label>
+        <input type="time" id="event-end-time">
+      </div>
+
+      <div class="setting-item">
+        <button id="save-event" class="primary-btn">予定を保存</button>
       </div>
     </div>
   </div>
