@@ -1082,6 +1082,9 @@ function setupCalendarEventListeners() {
   // ログインボタン
   calendarElements.loginBtn.addEventListener('click', handleLoginClick);
 
+  // アジェンダセクション要素
+  const agendaSection = document.getElementById('agenda-section');
+
   // ビュー切替
   calendarElements.viewMonthBtn.addEventListener('click', () => {
     calendarState.view = 'month';
@@ -1089,6 +1092,7 @@ function setupCalendarEventListeners() {
     calendarElements.viewWeekBtn.classList.remove('active');
     calendarElements.monthView.style.display = 'block';
     calendarElements.weekView.style.display = 'none';
+    if (agendaSection) agendaSection.style.display = 'block'; // 月ビューで表示
     renderCalendar();
   });
 
@@ -1098,6 +1102,7 @@ function setupCalendarEventListeners() {
     calendarElements.viewMonthBtn.classList.remove('active');
     calendarElements.weekView.style.display = 'block';
     calendarElements.monthView.style.display = 'none';
+    if (agendaSection) agendaSection.style.display = 'none'; // 週ビューで非表示
     renderCalendar();
   });
 
