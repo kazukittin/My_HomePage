@@ -116,35 +116,43 @@ loadWeeklyWeather();
 async function loadNewsFeed() {
   const container = document.getElementById("news-feed");
 
-  try {
-    // RSS2JSON API を使用してYahoo!ニュースのRSSを取得
-    const rssUrl = encodeURIComponent("https://news.yahoo.co.jp/rss/topics/top-picks.xml");
-    const res = await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${rssUrl}`);
-    const data = await res.json();
+  // 複数のRSSソースを試す
+  const rssSources = [
+    { url: "https://www3.nhk.or.jp/rss/news/cat0.xml", name: "NHK" },
+    { url: "https://www.asahi.com/rss/asahi/newsheadlines.rdf", name: "朝日新聞" },
+    { url: "https://rss.itmedia.co.jp/rss/2.0/news_bursts.xml", name: "ITmedia" }
+  ];
 
-    if (data.status === "ok" && data.items && data.items.length > 0) {
-      container.innerHTML = data.items.slice(0, 8).map(item => {
-        const pubDate = new Date(item.pubDate);
-        const timeAgo = getTimeAgo(pubDate);
+  for (const source of rssSources) {
+    try {
+      const rssUrl = encodeURIComponent(source.url);
+      const res = await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${rssUrl}`);
+      const data = await res.json();
 
-        return `
-          <div class="news-item">
-            <a href="${item.link}" target="_blank">${item.title}</a>
-            <div class="news-source">
-              <span class="news-category">トップ</span>
-              <span>${timeAgo}</span>
+      if (data.status === "ok" && data.items && data.items.length > 0) {
+        container.innerHTML = data.items.slice(0, 8).map(item => {
+          const pubDate = new Date(item.pubDate);
+          const timeAgo = getTimeAgo(pubDate);
+
+          return `
+            <div class="news-item">
+              <a href="${item.link}" target="_blank">${item.title}</a>
+              <div class="news-source">
+                <span class="news-category">${source.name}</span>
+                <span>${timeAgo}</span>
+              </div>
             </div>
-          </div>
-        `;
-      }).join('');
-    } else {
-      // フォールバック: ダミーニュース
-      showDummyNews(container);
+          `;
+        }).join('');
+        return; // 成功したらループを抜ける
+      }
+    } catch (e) {
+      console.log(`${source.name} fetch failed, trying next...`);
     }
-  } catch (e) {
-    console.error("News fetch error:", e);
-    showDummyNews(container);
   }
+
+  // すべて失敗した場合はダミーニュース
+  showDummyNews(container);
 }
 
 function showDummyNews(container) {
