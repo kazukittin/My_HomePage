@@ -38,6 +38,11 @@ document.getElementById("open-settings").addEventListener("click", () => {
         clientIdInput.value = settings.clientId || '';
     }
 
+    const workerUrlInput = document.getElementById('worker-url-input');
+    if (workerUrlInput) {
+        workerUrlInput.value = settings.workerUrl || '';
+    }
+
     // カレンダーログアウトセクションの表示/非表示
     const logoutSection = document.getElementById("calendar-logout-section");
     if (logoutSection && typeof calendarState !== 'undefined') {
@@ -70,6 +75,12 @@ document.getElementById("save-settings").addEventListener("click", () => {
     const clientIdInput = document.getElementById('client-id-input');
     if (clientIdInput) {
         newSettings.clientId = clientIdInput.value || '';
+    }
+
+    // Worker URLも保存
+    const workerUrlInput = document.getElementById('worker-url-input');
+    if (workerUrlInput) {
+        newSettings.workerUrl = workerUrlInput.value || '';
     }
 
     saveSettingsToStorage(newSettings);

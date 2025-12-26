@@ -121,7 +121,9 @@ function loadCategories() {
         // ヘッダー
         const header = document.createElement("div");
         header.className = "category-header";
-        header.innerHTML = `<h3>${cat.name}</h3>`;
+        const h3 = document.createElement("h3");
+        h3.textContent = cat.name;
+        header.appendChild(h3);
 
         // 編集・削除ボタン
         const editBtn = document.createElement("button");
@@ -176,12 +178,22 @@ function loadCategories() {
                 faviconUrl = `https://www.google.com/s2/favicons?domain=${urlObj.hostname}&sz=32`;
             } catch { }
 
-            itemDiv.innerHTML = `
-        <a href="${item.url}" target="_blank">
-          ${faviconUrl ? `<img src="${faviconUrl}" class="favicon" alt="" onerror="this.style.display='none'">` : ''}
-          ${item.title}
-        </a>
-      `;
+            const link = document.createElement("a");
+            link.href = item.url;
+            link.target = "_blank";
+            link.rel = "noopener noreferrer"; // Security
+
+            if (faviconUrl) {
+                const img = document.createElement("img");
+                img.src = faviconUrl;
+                img.className = "favicon";
+                img.alt = "";
+                img.onerror = function() { this.style.display = 'none'; };
+                link.appendChild(img);
+            }
+            
+            link.appendChild(document.createTextNode(item.title));
+            itemDiv.appendChild(link);
 
             const itemEditBtn = document.createElement("button");
             itemEditBtn.className = "edit-btn";

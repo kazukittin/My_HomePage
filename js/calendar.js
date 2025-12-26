@@ -3,7 +3,11 @@
 // =====================================================
 
 // Cloudflare Worker URL
-const OAUTH_WORKER_URL = 'https://calendar-oauth.kazukittin.workers.dev';
+// Cloudflare Worker URL
+// 配布時は空文字か、ユーザー自身のWorker URLを設定するように案内してください
+const DEFAULT_WORKER_URL = 'https://calendar-oauth.example.workers.dev';
+const savedSettings = JSON.parse(localStorage.getItem("settings") || "{}");
+const OAUTH_WORKER_URL = savedSettings.workerUrl || DEFAULT_WORKER_URL;
 
 // カレンダー状態
 const calendarState = {

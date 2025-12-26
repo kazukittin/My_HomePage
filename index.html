@@ -3,6 +3,8 @@
 
 <head>
   <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy"
+    content="default-src 'self'; script-src 'self' https://accounts.google.com/gsi/client; style-src 'self' 'unsafe-inline'; img-src 'self' https://images.unsplash.com https://www.google.com data: blob:; connect-src 'self' https://api.rss2json.com https://api.open-meteo.com; frame-src https://accounts.google.com/gsi/;">
   <title>My Start Page</title>
   <link rel="stylesheet" href="style.css">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
@@ -22,7 +24,7 @@
     </div>
 
     <!-- 天気をクリックするとYahoo天気に飛ぶ -->
-    <a href="https://weather.yahoo.co.jp/weather/jp/13/4410/13120.html" target="_blank" id="today-weather"
+    <a href="https://weather.yahoo.co.jp/weather/" target="_blank" rel="noopener noreferrer" id="today-weather"
       class="weather-now">
       <span class="skeleton" style="width:150px">Loading...</span>
     </a>
@@ -60,7 +62,8 @@
       <section class="card news-card">
         <div class="section-header">
           <h2>📰 ニュース</h2>
-          <a href="https://news.google.com/home?hl=ja&gl=JP&ceid=JP%3Aja" target="_blank" class="more-link">もっと見る →</a>
+          <a href="https://news.google.com/home?hl=ja&gl=JP&ceid=JP%3Aja" target="_blank" rel="noopener noreferrer"
+            class="more-link">もっと見る →</a>
         </div>
         <div id="news-feed" class="news-feed">
           <div class="news-item skeleton-news">
@@ -156,6 +159,12 @@
         <label>Google OAuth Client ID</label>
         <input type="text" id="client-id-input" placeholder="xxxxxxxxx.apps.googleusercontent.com">
         <small style="color:#888;">Google Cloud Console で取得</small>
+      </div>
+
+      <div class="setting-item">
+        <label>OAuth Worker URL (Optional)</label>
+        <input type="text" id="worker-url-input" placeholder="https://your-worker.workers.dev">
+        <small style="color:#888;">自前のCloudflare Workerを使う場合のみ設定</small>
       </div>
 
       <div class="setting-item" id="calendar-logout-section" style="display:none;">
