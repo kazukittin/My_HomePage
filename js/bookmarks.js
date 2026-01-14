@@ -198,11 +198,11 @@ function loadCategories() {
             itemDiv.addEventListener('drop', handleDrop);
             itemDiv.addEventListener('dragend', handleDragEnd);
 
-            // Favicon取得
+            // Favicon取得 (DuckDuckGoサービス使用 - より信頼性が高い)
             let faviconUrl = '';
             try {
                 const urlObj = new URL(item.url);
-                faviconUrl = `https://www.google.com/s2/favicons?domain=${urlObj.hostname}&sz=32`;
+                faviconUrl = `https://icons.duckduckgo.com/ip3/${urlObj.hostname}.ico`;
             } catch { }
 
             const link = document.createElement("a");
@@ -210,14 +210,25 @@ function loadCategories() {
             link.target = "_blank";
             link.rel = "noopener noreferrer"; // Security
 
+            // ファビコンまたはデフォルトアイコンを追加
+            const iconSpan = document.createElement("span");
+            iconSpan.className = "favicon-wrapper";
+            
             if (faviconUrl) {
                 const img = document.createElement("img");
                 img.src = faviconUrl;
                 img.className = "favicon";
                 img.alt = "";
-                img.onerror = function () { this.style.display = 'none'; };
-                link.appendChild(img);
+                // 読み込み失敗時はデフォルトアイコンを表示
+                img.onerror = function () { 
+                    this.style.display = 'none';
+                    iconSpan.innerHTML = '<span class="default-icon">🔗</span>';
+                };
+                iconSpan.appendChild(img);
+            } else {
+                iconSpan.innerHTML = '<span class="default-icon">🔗</span>';
             }
+            link.appendChild(iconSpan);
 
             link.appendChild(document.createTextNode(item.title));
             itemDiv.appendChild(link);

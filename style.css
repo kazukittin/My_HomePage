@@ -284,18 +284,35 @@ button:hover {
   text-decoration: none;
   display: flex;
   align-items: center;
+  gap: 8px;
 }
 
 .item a:hover {
   color: #00f2fe;
 }
 
+.favicon-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
 .favicon {
   width: 16px;
   height: 16px;
-  margin-right: 8px;
-  border-radius: 2px;
+  border-radius: 3px;
+  object-fit: contain;
 }
+
+.default-icon {
+  font-size: 14px;
+  line-height: 1;
+  opacity: 0.7;
+}
+
 
 /* Modal Styles */
 .modal {
@@ -472,25 +489,42 @@ button:hover {
   border: 2px dashed #fff;
 }
 
-/* Favicon styles */
+/* Favicon styles (duplicate - kept for compatibility) */
 .item a {
   flex: 1;
   color: #e0e0e0;
   text-decoration: none;
   display: flex;
   align-items: center;
+  gap: 8px;
 }
 
 .item a:hover {
   color: #00f2fe;
 }
 
+.favicon-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
 .favicon {
   width: 16px;
   height: 16px;
-  margin-right: 8px;
-  border-radius: 2px;
+  border-radius: 3px;
+  object-fit: contain;
 }
+
+.default-icon {
+  font-size: 14px;
+  line-height: 1;
+  opacity: 0.7;
+}
+
 
 /* Modal Styles */
 .modal {
