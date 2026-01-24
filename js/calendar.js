@@ -258,7 +258,7 @@ async function fetchCalendarEvents() {
 }
 
 // イベント作成
-async function createCalendarEvent(title, date, startTime, endTime) {
+async function createCalendarEvent(title, date, startTime, endTime, endDate = null) {
     if (!calendarState.accessToken) {
         alert('先にGoogleにログインしてください');
         return false;
@@ -270,7 +270,7 @@ async function createCalendarEvent(title, date, startTime, endTime) {
         event = {
             summary: title,
             start: { dateTime: `${date}T${startTime}:00`, timeZone: 'Asia/Tokyo' },
-            end: { dateTime: `${date}T${endTime}:00`, timeZone: 'Asia/Tokyo' }
+            end: { dateTime: `${endDate || date}T${endTime}:00`, timeZone: 'Asia/Tokyo' }
         };
     } else {
         // 終日イベント
@@ -595,16 +595,35 @@ function closeEventDetailFn() {
 }
 
 // クイック予定作成
-async function createQuickEvent(title) {
-    const date = calendarElements.eventDate.value;
-    if (!date) {
+async function createQuickEvent(type) {
+    const dateStr = calendarElements.eventDate.value;
+    if (!dateStr) {
         alert('日付を選択してください');
         return;
     }
-    
-    // 時間指定なし（終日）で作成
-    // ユーザーからの要望によりワンクリックで追加
-    const success = await createCalendarEvent(title, date, '', '');
+
+    let title = type;
+    let startTime, endTime, endDateStr;
+
+    if (type === '日勤') {
+        startTime = '08:30';
+        endTime = '17:15';
+        endDateStr = dateStr;
+    } else if (type === '夜勤') {
+        startTime = '08:30';
+        endTime = '08:30';
+        // 翌日を計算 (YYYY-MM-DD is parsed as UTC)
+        const d = new Date(dateStr);
+        d.setUTCDate(d.getUTCDate() + 1);
+        endDateStr = d.toISOString().split('T')[0];
+    } else {
+        // その他（現時点では想定なしだが、念のため終日扱い）
+        const success = await createCalendarEvent(title, dateStr, '', '');
+        if (success) closeEventModalFn();
+        return;
+    }
+
+    const success = await createCalendarEvent(title, dateStr, startTime, endTime, endDateStr);
     if (success) {
         closeEventModalFn();
     }
