@@ -7,7 +7,8 @@ const defaultSettings = {
     bgUrl: "https://images.unsplash.com/photo-1496568816309-51d7c20e3b21?q=80&w=1631&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
     lat: "35.6895",
     lon: "139.6917",
-    clientId: ""
+    clientId: "",
+    workerUrl: ""
 };
 
 // キャッシュ: 非同期読み込み完了まで使用

@@ -5,7 +5,7 @@
 // Cloudflare Worker URL
 // Cloudflare Worker URL
 // 配布時は空文字か、ユーザー自身のWorker URLを設定するように案内してください
-const DEFAULT_WORKER_URL = 'https://calendar-oauth.kazukittin.workers.dev';
+const DEFAULT_WORKER_URL = '';
 
 // Worker URLの取得（IndexedDBからの読み込み後に更新）
 let OAUTH_WORKER_URL = DEFAULT_WORKER_URL;
@@ -190,6 +190,12 @@ function handleLoginClick() {
         // ログイン中はGoogleカレンダーを開く
         window.open('https://calendar.google.com', '_blank');
     } else {
+        // Worker URLが設定されていない場合
+        if (!OAUTH_WORKER_URL) {
+            alert('設定画面から OAuth Worker URL を設定してください。');
+            document.getElementById('open-settings').click(); // 設定画面を開く
+            return;
+        }
         // ログイン - Workerにリダイレクト
         window.location.href = `${OAUTH_WORKER_URL}/auth`;
     }

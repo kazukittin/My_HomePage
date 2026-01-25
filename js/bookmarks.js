@@ -334,8 +334,18 @@ document.getElementById("toggle-edit").addEventListener("click", () => {
 
 // ---- データバックアップ ----
 document.getElementById("export-data").addEventListener("click", () => {
-    const data = getData();
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    // カテゴリと設定の両方を取得
+    const categories = getData();
+    const settings = typeof getSettings === 'function' ? getSettings() : {};
+
+    const backupData = {
+        version: 1,
+        date: new Date().toISOString(),
+        categories: categories,
+        settings: settings
+    };
+
+    const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -352,21 +362,40 @@ document.getElementById("import-file").addEventListener("change", (e) => {
     const file = e.target.files[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
         try {
             const data = JSON.parse(e.target.result);
-            if (Array.isArray(data)) {
+
+            // 新形式: オブジェクトで { categories, settings, ... }
+            if (data.categories && Array.isArray(data.categories)) {
+                // カテゴリ復元
+                saveData(data.categories);
+
+                // 設定復元
+                if (data.settings && typeof saveSettingsToStorage === 'function') {
+                    saveSettingsToStorage(data.settings);
+                    if (typeof applySettings === 'function') applySettings();
+                }
+
+                loadCategories();
+                alert("設定とブックマークを復元しました！");
+            }
+            // 旧形式: 配列そのもの
+            else if (Array.isArray(data)) {
                 saveData(data);
                 loadCategories();
-                alert("復元しました！");
+                alert("ブックマークを復元しました！（設定データは含まれていません）");
             } else {
                 alert("データ形式が正しくありません");
             }
         } catch (err) {
             alert("読み込みエラー: " + err);
+            console.error(err);
         }
     };
     reader.readAsText(file);
+    // ファイル選択をリセットして同じファイルを再度選べるようにする
+    e.target.value = '';
 });
 
 // ---- ブックマーク編集モーダル ----
